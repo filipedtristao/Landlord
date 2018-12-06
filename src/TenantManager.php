@@ -140,6 +140,8 @@ class TenantManager {
 
         $model->addGlobalScope($this->scopeName, function (Builder $builder) use ($model, $landlord) {
             $builder->where(function($builder) use ($model, $landlord) {
+                $landlord->applySharingScopeQuery($builder, $model);
+
                 $landlord->modelTenants($model)->each(function ($id, $tenant) use ($builder, $model, $landlord) {
                     $landlord->applyTenantScopeQuery($builder, $model, $tenant, $id);
                 });
@@ -172,8 +174,18 @@ class TenantManager {
         if ($this->getTenants()->first() && $this->getTenants()->first() != $id) {
             $id = $this->getTenants()->first();
         }
-        
+
+
         $builder->orWhere($model->getQualifiedTenant($tenant), '=', $id);
+    }
+
+    private function applySharingScopeQuery($builder, $model) {
+        if ($model->hasCompanySharing) {
+            $tenant_id = $this->getTenants()->first();
+            $builder->orWhereHas('sharedWithCompanies', function($builder) use ($tenant_id) {
+                return $builder->where('company_id', $tenant_id);
+            });
+        }
     }
 
     /**
