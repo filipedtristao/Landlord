@@ -6,8 +6,11 @@ use HipsterJazzbo\Landlord\Exceptions\TenantColumnUnknownException;
 use HipsterJazzbo\Landlord\Exceptions\TenantNullIdException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Traits\Macroable;
+use function app;
+use function collect;
 
 class TenantManager {
 
@@ -29,12 +32,15 @@ class TenantManager {
     protected $deferredModels;
     protected $scopeName = 'tenant';
 
+    protected $request;
+    
     /**
      * Landlord constructor.
      */
     public function __construct() {
         $this->tenants = collect();
         $this->deferredModels = collect();
+        $this->request = app()->make(Request::class);
     }
 
     /**
@@ -175,7 +181,6 @@ class TenantManager {
             $id = $this->getTenants()->first();
         }
 
-
         $builder->orWhere($model->getQualifiedTenant($tenant), '=', $id);
     }
 
@@ -183,7 +188,18 @@ class TenantManager {
         if ($model->hasCompanySharing) {
             $tenant_id = $this->getTenants()->first();
             $builder->orWhereHas('sharedWithCompanies', function($builder) use ($tenant_id) {
-                return $builder->where('company_id', $tenant_id);
+                $builder->where('referenced_company_id', $tenant_id);
+                
+                if ($this->request->get('tenancy_share_approval_status')) {
+                    if (is_array($this->request->get('tenancy_share_approval_status'))){
+                        $builder->whereIn('approval_status', $this->request->get('tenancy_share_approval_status'));
+                    } else {
+                        $builder->where('approval_status', $this->request->get('tenancy_share_approval_status'));
+                    }
+                    
+                }
+                
+                return $builder;
             });
         }
     }
@@ -217,7 +233,7 @@ class TenantManager {
      *
      * @param Model $model
      *
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function newQueryWithoutTenants(Model $model) {
         return $model->newQuery()->withoutGlobalScopes([$this->scopeName]);
