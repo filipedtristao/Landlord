@@ -12,8 +12,8 @@ use Illuminate\Support\Traits\Macroable;
 use function app;
 use function collect;
 
-class TenantManager {
-
+class TenantManager
+{
     use Macroable;
 
     /**
@@ -37,7 +37,8 @@ class TenantManager {
     /**
      * Landlord constructor.
      */
-    public function __construct() {
+    public function __construct()
+    {
         $this->tenants = collect();
         $this->deferredModels = collect();
         $this->request = app()->make(Request::class);
@@ -48,7 +49,8 @@ class TenantManager {
      *
      * @return void
      */
-    public function enable() {
+    public function enable()
+    {
         $this->enabled = true;
     }
 
@@ -57,7 +59,8 @@ class TenantManager {
      *
      * @return void
      */
-    public function disable() {
+    public function disable()
+    {
         $this->enabled = false;
     }
 
@@ -69,7 +72,8 @@ class TenantManager {
      *
      * @throws TenantNullIdException
      */
-    public function addTenant($tenant, $id = null) {
+    public function addTenant($tenant, $id = null)
+    {
         if (func_num_args() == 1 && $tenant instanceof Model) {
             $id = $tenant->getKey();
         }
@@ -86,7 +90,8 @@ class TenantManager {
      *
      * @param string|Model $tenant
      */
-    public function removeTenant($tenant) {
+    public function removeTenant($tenant)
+    {
         $this->tenants->pull($this->getTenantKey($tenant));
     }
 
@@ -97,14 +102,16 @@ class TenantManager {
      *
      * @return bool
      */
-    public function hasTenant($tenant) {
+    public function hasTenant($tenant)
+    {
         return $this->tenants->has($this->getTenantKey($tenant));
     }
 
     /**
      * @return Collection
      */
-    public function getTenants() {
+    public function getTenants()
+    {
         return $this->tenants;
     }
 
@@ -115,7 +122,8 @@ class TenantManager {
      *
      * @return mixed
      */
-    public function getTenantId($tenant) {
+    public function getTenantId($tenant)
+    {
         if (!$this->hasTenant($tenant)) {
             throw new TenantColumnUnknownException(
             '$tenant must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
@@ -130,7 +138,8 @@ class TenantManager {
      *
      * @param Model|BelongsToTenants $model
      */
-    public function applyTenantScopes(Model $model) {
+    public function applyTenantScopes(Model $model)
+    {
         if (!$this->enabled) {
             return;
         }
@@ -145,7 +154,7 @@ class TenantManager {
         $landlord = $this;
 
         $model->addGlobalScope($this->scopeName, function (Builder $builder) use ($model, $landlord) {
-            $builder->where(function($builder) use ($model, $landlord) {
+            $builder->where(function ($builder) use ($model, $landlord) {
                 $landlord->applySharingScopeQuery($builder, $model);
 
                 $landlord->modelTenants($model)->each(function ($id, $tenant) use ($builder, $model, $landlord) {
@@ -158,11 +167,12 @@ class TenantManager {
     /**
      * Applies applicable tenant scopes to deferred model booted before tenants setup.
      */
-    public function applyTenantScopesToDeferredModels() {
+    public function applyTenantScopesToDeferredModels()
+    {
         $this->deferredModels->each(function ($model) {
             $landlord = $this;
             $model->addGlobalScope($this->scopeName, function (Builder $builder) use ($model, $landlord) {
-                $builder->where(function($builder) use ($model, $landlord) {
+                $builder->where(function ($builder) use ($model, $landlord) {
                     $landlord->modelTenants($model)->each(function ($id, $tenant) use ($builder, $model, $landlord) {
                         if (!isset($model->{$tenant})) {
                             $model->setAttribute($tenant, $id);
@@ -176,27 +186,34 @@ class TenantManager {
         $this->deferredModels = collect();
     }
 
-    private function applyTenantScopeQuery($builder, $model, $tenant, $id) {
+    private function applyTenantScopeQuery($builder, $model, $tenant, $id)
+    {
         if ($this->getTenants()->first() && $this->getTenants()->first() != $id) {
             $id = $this->getTenants()->first();
         }
 
         $builder->orWhere($model->getQualifiedTenant($tenant), '=', $id);
+
+        if ($model->hasDefaultRecords) {
+            $builder->orWhereNull($model->getQualifiedTenant($tenant));
+        }
     }
 
-    private function applySharingScopeQuery($builder, $model) {
+    private function applySharingScopeQuery($builder, $model)
+    {
         if ($model->hasCompanySharing) {
             $tenant_id = $this->getTenants()->first();
-            $builder->orWhereHas('sharedWithCompanies', function($builder) use ($tenant_id) {
+            $builder->orWhereHas('sharedWithCompanies', function ($builder) use ($tenant_id) {
                 $builder->where('referenced_company_id', $tenant_id);
                 
                 if ($this->request->get('tenancy_share_approval_status')) {
-                    if (is_array($this->request->get('tenancy_share_approval_status'))){
+                    if (is_array($this->request->get('tenancy_share_approval_status'))) {
                         $builder->whereIn('approval_status', $this->request->get('tenancy_share_approval_status'));
                     } else {
                         $builder->where('approval_status', $this->request->get('tenancy_share_approval_status'));
                     }
-                    
+                } else {
+                    $builder->where('approval_status', '<>', 3);
                 }
                 
                 return $builder;
@@ -209,7 +226,8 @@ class TenantManager {
      *
      * @param Model $model
      */
-    public function newModel(Model $model) {
+    public function newModel(Model $model)
+    {
         if (!$this->enabled) {
             return;
         }
@@ -235,7 +253,8 @@ class TenantManager {
      *
      * @return Builder
      */
-    public function newQueryWithoutTenants(Model $model) {
+    public function newQueryWithoutTenants(Model $model)
+    {
         return $model->newQuery()->withoutGlobalScopes([$this->scopeName]);
     }
 
@@ -248,7 +267,8 @@ class TenantManager {
      *
      * @return string
      */
-    protected function getTenantKey($tenant) {
+    protected function getTenantKey($tenant)
+    {
         if ($tenant instanceof Model) {
             $tenant = $tenant->getForeignKey();
         }
@@ -270,8 +290,8 @@ class TenantManager {
      *
      * @return Collection
      */
-    protected function modelTenants(Model $model) {
+    protected function modelTenants(Model $model)
+    {
         return $this->tenants->only($model->getTenantColumns());
     }
-
 }
