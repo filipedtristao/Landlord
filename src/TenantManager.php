@@ -126,7 +126,7 @@ class TenantManager
     {
         if (!$this->hasTenant($tenant)) {
             throw new TenantColumnUnknownException(
-            '$tenant must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
+                '$tenant must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
             );
         }
 
@@ -203,8 +203,14 @@ class TenantManager
     {
         if ($model->hasCompanySharing) {
             $tenant_id = $this->getTenants()->first();
-            $builder->orWhereHas('sharedWithCompanies', function ($builder) use ($tenant_id) {
-                $builder->where('referenced_company_id', $tenant_id);
+            $builder->orWhereHas('sharedWithCompaniesAndEmails', function ($builder) use ($tenant_id) {
+                $builder->where(function ($builder) use ($tenant_id) {
+                    $builder->where('referenced_company_id', $tenant_id);
+
+                    if (($token = request()->get('_share_token'))){
+                        $builder->orWhere('token', $token);
+                    }
+                });
                 
                 if ($this->request->get('tenancy_share_approval_status')) {
                     if (is_array($this->request->get('tenancy_share_approval_status'))) {
@@ -275,7 +281,7 @@ class TenantManager
 
         if (!is_string($tenant)) {
             throw new TenantColumnUnknownException(
-            '$tenant must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
+                '$tenant must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
             );
         }
 
